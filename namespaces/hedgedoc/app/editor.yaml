@@ -1,0 +1,198 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"hedgedoc:latest","namespace":"hedgedoc"},"fieldPath":"spec.template.spec.containers[?(@.name==\"hedgedoc\")].image","pause":"false"}]'
+  labels:
+    app.kubernetes.io/instance: hedgedoc
+    app.kubernetes.io/name: hedgedoc
+  name: hedgedoc
+  namespace: hedgedoc
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: hedgedoc
+      app.kubernetes.io/name: hedgedoc
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: hedgedoc
+        app.kubernetes.io/name: hedgedoc
+    spec:
+      containers:
+      - env:
+        - name: CMD_ALLOW_ANONYMOUS
+          value: 'false'
+        - name: CMD_ALLOW_ANONYMOUS_EDITS
+          value: 'false'
+        - name: CMD_DOMAIN
+          value: md.josie.cloud
+        - name: CMD_FORBIDDEN_NOTE_IDS
+          value: robots.txt, favicon.ico, api, build, css, docs, fonts, js, uploads,
+            vendor, views
+        - name: CMD_GITHUB_CLIENTID
+          value: Ov23liMyLlkwn5UF8Twe
+        - name: CMD_HOST
+          value: 0.0.0.0
+        - name: CMD_IMAGE_UPLOAD_TYPE
+          value: filesystem
+        - name: CMD_PROTOCOL_USESSL
+          value: 'true'
+        - name: CMD_SOURCE_URL
+          value: https://github.com/pfeifferj/specdoc
+        - name: CMD_SPEC_BOARD_URL
+          value: https://specs.josie.cloud
+        - name: CMD_SPEC_DEFAULT_NAMESPACE
+          value: pfeifferj/hedgedoc-spec
+        - name: CMD_TOOBUSY_LAG
+          value: '70'
+        - name: CMD_URL_ADDPORT
+          value: 'false'
+        - name: CMD_URL_PATH
+        - name: DEBUG
+          value: 'false'
+        - name: NODE_ENV
+          value: production
+        - name: CMD_PORT
+          value: '3000'
+        envFrom:
+        - configMapRef:
+            name: hedgedoc-database
+        - secretRef:
+            name: hedgedoc-editor
+        image: image-registry.openshift-image-registry.svc:5000/hedgedoc/hedgedoc@sha256:3714ff6e64e10dc86dc8a882a8f3c1f0473e26a1c2569d04a0ac2ed7db5172f4
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /_health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: hedgedoc
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /status
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 2
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 50m
+            memory: 256Mi
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /hedgedoc/public/uploads
+          name: uploads
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: master-0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: hedgedoc
+      serviceAccountName: hedgedoc
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: hedgedoc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: hedgedoc
+    app.kubernetes.io/name: hedgedoc
+  name: hedgedoc
+  namespace: hedgedoc
+spec:
+  ports:
+  - name: http
+    port: 3000
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/instance: hedgedoc
+    app.kubernetes.io/name: hedgedoc
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    route.openshift.io/termination: edge
+  labels:
+    app.kubernetes.io/instance: hedgedoc
+    app.kubernetes.io/name: hedgedoc
+  name: hedgedoc
+  namespace: hedgedoc
+spec:
+  ingressClassName: openshift-default
+  rules:
+  - host: md.josie.cloud
+    http:
+      paths:
+      - backend:
+          service:
+            name: hedgedoc
+            port:
+              number: 3000
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - md.josie.cloud
+    secretName: hedgedoc-tls
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app.kubernetes.io/component: pvc
+    app.kubernetes.io/instance: hedgedoc
+    app.kubernetes.io/name: hedgedoc
+  name: hedgedoc
+  namespace: hedgedoc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: customer-workload-storage
+  volumeName: hedgedoc-uploads-pv
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: hedgedoc
+    app.kubernetes.io/name: hedgedoc
+  name: hedgedoc
+  namespace: hedgedoc

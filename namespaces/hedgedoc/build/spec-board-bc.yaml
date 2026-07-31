@@ -1,0 +1,30 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: spec-board
+  namespace: hedgedoc
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/pfeifferj/specdoc.git
+      ref: master
+    contextDir: spec-board
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+      buildArgs:
+        - name: BASE
+          value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:20-alpine
+  output:
+    to:
+      kind: ImageStreamTag
+      name: spec-board:latest
+  completionDeadlineSeconds: 1800
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2

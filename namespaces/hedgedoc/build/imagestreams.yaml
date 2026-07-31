@@ -1,0 +1,25 @@
+# Build outputs, declared so a fresh namespace comes up complete. An ImageStream
+# carries no spec worth losing, so applying these over existing ones is a no-op.
+#
+# Builds push :latest. The tag a Deployment actually runs is pinned to a digest
+# by its image trigger, and :prod / :prod-previous are moved by hand after a
+# rollout is verified, so the pruner cannot collect the image you would roll
+# back to.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      name: editor-src
+      namespace: hedgedoc
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      name: hedgedoc
+      namespace: hedgedoc
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      name: spec-board
+      namespace: hedgedoc

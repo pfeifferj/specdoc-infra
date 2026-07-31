@@ -1,0 +1,40 @@
+# The image trigger controller moves deployments to a new digest with its own
+# credentials, so the poller needs nothing beyond starting a build.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: specdoc-ci
+      namespace: hedgedoc
+
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: specdoc-ci
+      namespace: hedgedoc
+    rules:
+      - apiGroups: ["build.openshift.io"]
+        resources: ["buildconfigs"]
+        verbs: ["get", "list"]
+      - apiGroups: ["build.openshift.io"]
+        resources: ["buildconfigs/instantiate"]
+        verbs: ["create"]
+      - apiGroups: ["build.openshift.io"]
+        resources: ["builds"]
+        verbs: ["get", "list"]
+
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: specdoc-ci
+      namespace: hedgedoc
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: specdoc-ci
+    subjects:
+      - kind: ServiceAccount
+        name: specdoc-ci
+        namespace: hedgedoc

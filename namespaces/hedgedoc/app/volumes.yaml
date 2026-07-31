@@ -1,0 +1,72 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    app: hedgedoc
+  name: hedgedoc-uploads-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 8Gi
+  claimRef:
+    kind: PersistentVolumeClaim
+    name: hedgedoc
+    namespace: hedgedoc
+  hostPath:
+    path: /var/data/hedgedoc/uploads
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: customer-workload-storage
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    app: hedgedoc
+  name: hedgedoc-postgres-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 8Gi
+  claimRef:
+    kind: PersistentVolumeClaim
+    name: hedgedoc-postgres
+    namespace: hedgedoc
+  hostPath:
+    path: /var/data/hedgedoc/postgresql
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: customer-workload-storage
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    app: hedgedoc
+  name: hedgedoc-backups-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 8Gi
+  claimRef:
+    kind: PersistentVolumeClaim
+    name: hedgedoc-backups
+    namespace: hedgedoc
+  hostPath:
+    path: /var/data/hedgedoc/backups
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: customer-workload-storage
+  volumeMode: Filesystem

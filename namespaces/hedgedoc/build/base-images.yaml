@@ -1,0 +1,35 @@
+# Namespace-local mirrors of the build base images. Every build on this cluster
+# pulls Docker Hub anonymously from one shared egress IP, so without these the
+# rate limit is a build outage waiting to happen. referencePolicy: Local also
+# pins the digest each build resolved.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: node
+  namespace: hedgedoc
+spec:
+  tags:
+    - name: 20-bookworm
+      from:
+        kind: DockerImage
+        name: docker.io/library/node:20-bookworm
+      referencePolicy:
+        type: Local
+      importPolicy:
+        scheduled: true
+    - name: 20-bookworm-slim
+      from:
+        kind: DockerImage
+        name: docker.io/library/node:20-bookworm-slim
+      referencePolicy:
+        type: Local
+      importPolicy:
+        scheduled: true
+    - name: 20-alpine
+      from:
+        kind: DockerImage
+        name: docker.io/library/node:20-alpine
+      referencePolicy:
+        type: Local
+      importPolicy:
+        scheduled: true

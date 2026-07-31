@@ -1,0 +1,22 @@
+---
+# Postgres is password-gated only; this keeps 5432 unreachable from other
+# namespaces. The allow covers all same-namespace pods because the pgdump
+# job's pods carry only job-name labels and cannot be selected by app label.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-namespace-only
+  namespace: hedgedoc
+spec:
+  ingress:
+  - from:
+    - podSelector: {}
+    ports:
+    - port: 5432
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: hedgedoc
+      component: postgres
+  policyTypes:
+  - Ingress

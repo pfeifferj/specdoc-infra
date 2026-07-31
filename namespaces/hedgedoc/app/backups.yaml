@@ -1,0 +1,122 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: hedgedoc
+    component: backup
+  name: hedgedoc-pgdump
+  namespace: hedgedoc
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata: {}
+    spec:
+      activeDeadlineSeconds: 3600
+      template:
+        metadata: {}
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -ec
+            - '# Dump to a temp name, verify it lists, then publish. A failed
+
+              # or truncated dump never becomes the day''s file, and the
+
+              # retention prune only runs once a good dump exists, so a run
+
+              # of silent failures cannot delete the last good backup.
+
+              # Stale .part files are cleaned first: a failed run exits before
+
+              # its own prune, so they would otherwise accumulate forever.
+
+              rm -f /backups/.hedgedoc-*.dump.part /backups/.uploads-*.tgz.part
+
+              tmp="/backups/.hedgedoc-$(date +%F).dump.part"
+
+              out="/backups/hedgedoc-$(date +%F).dump"
+
+              pg_dump -Fc -h hedgedoc-postgres -U hedgedoc hedgedoc > "$tmp"
+
+              pg_restore --list "$tmp" > /dev/null
+
+              mv -f "$tmp" "$out"
+
+              find /backups -name ''hedgedoc-*.dump'' -mtime +14 -delete
+
+              # The uploads tar follows the same verify-then-publish pattern. It lands
+
+              # on the same disk it protects, so it covers deletion and corruption,
+              not
+
+              # disk loss.
+
+              utmp="/backups/.uploads-$(date +%F).tgz.part"
+
+              uout="/backups/uploads-$(date +%F).tgz"
+
+              tar czf "$utmp" -C /uploads .
+
+              tar tzf "$utmp" > /dev/null
+
+              mv -f "$utmp" "$uout"
+
+              find /backups -name ''uploads-*.tgz'' -mtime +14 -delete
+
+              ls -lh /backups | tail -5
+
+              '
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: CMD_DB_PASSWORD
+                  name: hedgedoc-postgres
+            image: image-registry.openshift-image-registry.svc:5000/openshift/postgresql:15-el9
+            imagePullPolicy: IfNotPresent
+            name: pgdump
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /backups
+              name: backups
+            - mountPath: /uploads
+              name: uploads
+              readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/hostname: master-0
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: backups
+            persistentVolumeClaim:
+              claimName: hedgedoc-backups
+          - name: uploads
+            persistentVolumeClaim:
+              claimName: hedgedoc
+  schedule: 10 3 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: hedgedoc-backups
+  namespace: hedgedoc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: customer-workload-storage
+  volumeName: hedgedoc-backups-pv

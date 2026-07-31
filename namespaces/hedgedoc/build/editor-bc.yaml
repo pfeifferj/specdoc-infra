@@ -1,0 +1,81 @@
+# Two BuildConfigs, because the source snapshot is expensive and rarely
+# changes: editor-src does a full upstream clone (~125 MB, no cache in a build
+# pod) plus a full yarn install, editor only re-runs the rebrand overlay and
+# webpack. Splitting them turns a ten-minute build into a two-minute one for
+# every change that is not an upstream bump.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: build.openshift.io/v1
+    kind: BuildConfig
+    metadata:
+      name: editor-src
+      namespace: hedgedoc
+    spec:
+      source:
+        type: Git
+        git:
+          uri: https://github.com/pfeifferj/specdoc.git
+          ref: master
+        contextDir: editor
+      strategy:
+        type: Docker
+        dockerStrategy:
+          dockerfilePath: Containerfile.src
+          buildArgs:
+            - name: BASE
+              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:20-bookworm
+      output:
+        to:
+          kind: ImageStreamTag
+          name: editor-src:latest
+      # A build wedged in New/Pending otherwise trips the poller's in-flight
+      # check forever and silently halts all deploys.
+      completionDeadlineSeconds: 3600
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      successfulBuildsHistoryLimit: 2
+      failedBuildsHistoryLimit: 2
+
+  - apiVersion: build.openshift.io/v1
+    kind: BuildConfig
+    metadata:
+      name: editor
+      namespace: hedgedoc
+    spec:
+      source:
+        type: Git
+        git:
+          uri: https://github.com/pfeifferj/specdoc.git
+          ref: master
+        contextDir: editor
+      strategy:
+        type: Docker
+        dockerStrategy:
+          dockerfilePath: Containerfile
+          buildArgs:
+            - name: SRC
+              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/editor-src:latest
+            - name: RUNTIME
+              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:20-bookworm-slim
+      output:
+        to:
+          kind: ImageStreamTag
+          name: hedgedoc:latest
+      completionDeadlineSeconds: 3600
+      # A new source snapshot must reach the app image without waiting for the
+      # next commit.
+      triggers:
+        - type: ImageChange
+          imageChange:
+            from:
+              kind: ImageStreamTag
+              name: editor-src:latest
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      successfulBuildsHistoryLimit: 2
+      failedBuildsHistoryLimit: 2

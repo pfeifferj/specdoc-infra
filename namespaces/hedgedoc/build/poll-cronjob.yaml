@@ -1,0 +1,96 @@
+# What makes a push to master a deploy.
+#
+# Not a webhook: github validates TLS, and the cluster's api endpoint serves its
+# own CA, so a build-triggering webhook would need "disable ssl verification"
+# ticked. Polling needs nothing inbound.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: specdoc-poll
+  namespace: hedgedoc
+spec:
+  suspend: false
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  # Failed pods stay around long enough to be debugged days later.
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 60
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          serviceAccountName: specdoc-ci
+          restartPolicy: Never
+          containers:
+            - name: poll
+              image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+              env:
+                - name: REPO
+                  value: pfeifferj/specdoc
+                - name: BRANCH
+                  value: master
+                - name: GH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: specdoc-poll
+                      key: GITHUB_TOKEN
+                      optional: true
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  # The github api rather than git ls-remote: the cli image has
+                  # curl but no git. Unauthenticated is 60 requests an hour per
+                  # egress ip, shared with every tenant behind it; a token in
+                  # the optional specdoc-poll secret gets a separate limit.
+                  auth=()
+                  [ -n "${GH_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GH_TOKEN")
+                  head=$(curl -sf "${auth[@]}" -H 'Accept: application/vnd.github.sha' \
+                    "https://api.github.com/repos/$REPO/commits/$BRANCH" || true)
+                  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || {
+                    echo "no usable head from the github api: ${head:-empty}"
+                    exit 1
+                  }
+                  # editor-src is deliberately not polled: it only changes on an
+                  # upstream bump, which is a manual operation anyway, and it
+                  # costs a full clone plus a full dependency install. Its
+                  # ImageChange trigger rebuilds the editor image afterwards,
+                  # and a stale snapshot fails the editor build loudly.
+                  rc=0
+                  for bc in editor spec-board; do
+                    running=$(oc get builds -l "openshift.io/build-config.name=$bc" \
+                      -o go-template='{{range .items}}{{.status.phase}}{{"\n"}}{{end}}' \
+                      | grep -cE '^(New|Pending|Running)$' || true)
+                    if [ "$running" != 0 ]; then
+                      echo "$bc: build in flight, skipping"
+                      continue
+                    fi
+                    # Only Complete builds count: comparing against a failed
+                    # build at head would read as up to date, and the failure
+                    # would sit unretried until the next push. A persistently
+                    # failing build is therefore retried every tick; the
+                    # in-flight check spaces the retries.
+                    last=$(oc get builds -l "openshift.io/build-config.name=$bc" \
+                      --sort-by=.metadata.creationTimestamp \
+                      -o go-template='{{range .items}}{{if eq .status.phase "Complete"}}{{.spec.revision.git.commit}}{{"\n"}}{{end}}{{end}}' \
+                      | tail -1 || true)
+                    if [ "$last" = "$head" ]; then
+                      echo "$bc: up to date at ${head:0:7}"
+                      continue
+                    fi
+                    # --commit pins the build to the sha that was compared, so a
+                    # push landing mid-run is picked up next tick rather than
+                    # silently built as this one.
+                    echo "$bc: ${last:0:7} -> ${head:0:7}"
+                    # One bc failing to instantiate must not stop the other.
+                    oc start-build "$bc" --commit="$head" || { echo "$bc: start-build failed"; rc=1; }
+                  done
+                  exit $rc
