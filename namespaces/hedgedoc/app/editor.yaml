@@ -48,6 +48,11 @@ spec:
           value: https://github.com/pfeifferj/specdoc
         - name: CMD_SPEC_BOARD_URL
           value: https://specs.josie.cloud
+        - name: CMD_SPEC_BOARD_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: spec-board-editor
+              key: token
         - name: CMD_SPEC_DEFAULT_NAMESPACE
           value: pfeifferj/hedgedoc-spec
         - name: CMD_TOOBUSY_LAG

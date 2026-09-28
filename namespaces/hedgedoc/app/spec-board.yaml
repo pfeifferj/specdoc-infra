@@ -42,6 +42,13 @@ spec:
               name: spec-board
         - name: HEDGEDOC_BASE_URL
           value: https://md.josie.cloud
+        - name: HEDGEDOC_INTERNAL_URL
+          value: http://hedgedoc:3000
+        - name: EDITOR_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: spec-board-editor
+              key: token
         - name: SPEC_BOARD_BASE_URL
           value: https://specs.josie.cloud
         - name: NAMESPACES
