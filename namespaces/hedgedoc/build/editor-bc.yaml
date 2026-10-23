@@ -24,7 +24,7 @@ items:
           dockerfilePath: Containerfile.src
           buildArgs:
             - name: BASE
-              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:20-bookworm
+              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:24-bookworm
       output:
         to:
           kind: ImageStreamTag
@@ -59,7 +59,7 @@ items:
             - name: SRC
               value: image-registry.openshift-image-registry.svc:5000/hedgedoc/editor-src:latest
             - name: RUNTIME
-              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:20-bookworm-slim
+              value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:24-bookworm-slim
       output:
         to:
           kind: ImageStreamTag
