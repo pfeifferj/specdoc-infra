@@ -16,7 +16,7 @@ spec:
       dockerfilePath: Dockerfile
       buildArgs:
         - name: BASE
-          value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:20-alpine
+          value: image-registry.openshift-image-registry.svc:5000/hedgedoc/node:24-alpine
   output:
     to:
       kind: ImageStreamTag
