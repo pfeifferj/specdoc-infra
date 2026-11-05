@@ -31,8 +31,6 @@ spec:
           value: 'false'
         - name: CMD_ALLOW_ANONYMOUS_EDITS
           value: 'false'
-        - name: CMD_DOMAIN
-          value: md.josie.cloud
         - name: CMD_FORBIDDEN_NOTE_IDS
           value: robots.txt, favicon.ico, api, build, css, docs, fonts, js, uploads,
             vendor, views
@@ -46,15 +44,12 @@ spec:
           value: 'true'
         - name: CMD_SOURCE_URL
           value: https://github.com/pfeifferj/specdoc
-        - name: CMD_SPEC_BOARD_URL
-          value: https://specs.josie.cloud
+        # The deployment overlay sets public origins and the default namespace.
         - name: CMD_SPEC_BOARD_SECRET
           valueFrom:
             secretKeyRef:
               name: spec-board-editor
               key: token
-        - name: CMD_SPEC_DEFAULT_NAMESPACE
-          value: pfeifferj/hedgedoc-spec
         - name: CMD_TOOBUSY_LAG
           value: '70'
         - name: CMD_URL_ADDPORT
@@ -143,35 +138,6 @@ spec:
     app.kubernetes.io/name: hedgedoc
   sessionAffinity: None
   type: ClusterIP
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    route.openshift.io/termination: edge
-  labels:
-    app.kubernetes.io/instance: hedgedoc
-    app.kubernetes.io/name: hedgedoc
-  name: hedgedoc
-  namespace: hedgedoc
-spec:
-  ingressClassName: openshift-default
-  rules:
-  - host: md.josie.cloud
-    http:
-      paths:
-      - backend:
-          service:
-            name: hedgedoc
-            port:
-              number: 3000
-        path: /
-        pathType: Prefix
-  tls:
-  - hosts:
-    - md.josie.cloud
-    secretName: hedgedoc-tls
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

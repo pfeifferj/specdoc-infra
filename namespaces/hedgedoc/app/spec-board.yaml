@@ -2,8 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"spec-board:latest","namespace":"hedgedoc"},"fieldPath":"spec.template.spec.containers[?(@.name==\"spec-board\")].image","pause":"false"}]'
+  # The deployment overlay manages the board image trigger.
   labels:
     app: hedgedoc
     component: spec-board
@@ -40,8 +39,6 @@ spec:
             secretKeyRef:
               key: CMD_DB_PASSWORD
               name: spec-board
-        - name: HEDGEDOC_BASE_URL
-          value: https://md.josie.cloud
         - name: HEDGEDOC_INTERNAL_URL
           value: http://hedgedoc:3000
         - name: EDITOR_SECRET
@@ -49,12 +46,7 @@ spec:
             secretKeyRef:
               name: spec-board-editor
               key: token
-        - name: SPEC_BOARD_BASE_URL
-          value: https://specs.josie.cloud
-        - name: NAMESPACES
-          value: pfeifferj/hedgedoc-spec,netfyr/specs
-        - name: DEFAULT_NAMESPACE
-          value: pfeifferj/hedgedoc-spec
+        # The deployment overlay sets the board origin, theme and namespaces.
         - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:
